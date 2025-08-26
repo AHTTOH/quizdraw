@@ -1,0 +1,3 @@
+@echo off
+flutter run -d web-server --dart-define=SUPABASE_URL=https://hdziascbcldyzmxhjaaj.supabase.co --dart-define=SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhkemlhc2NiY2xkeXpteGhqYWFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU5NzcxOTgsImV4cCI6MjA3MTU1MzE5OH0.dKOIjtYLP6HHIKfjY7aF4KBWPiyZC-XIWUL0aoPsgSo --dart-define=KAKAO_NATIVE_KEY=fcc22adb9317c5b498bddd5d1c592460
+pause
