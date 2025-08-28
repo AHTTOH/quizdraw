@@ -15,7 +15,7 @@ class _ResultModalState extends State<ResultModal> {
   @override
   Widget build(BuildContext context) {
     final isCorrect = widget.result['isCorrect'] ?? false;
-    final guess = widget.result['guess'] ?? '';
+    final guess = widget.result['guess'] ?? '답을 입력하지 않았습니다';
     final timeTaken = widget.result['timeTaken'] ?? 0;
     final coinReward = widget.result['coinReward'] ?? 0;
 
@@ -87,7 +87,7 @@ class _ResultModalState extends State<ResultModal> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          widget.result['correctAnswer'] ?? '알 수 없음',
+                          widget.result['correctAnswer'],
                           style: const TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
@@ -277,9 +277,9 @@ class _ResultModalState extends State<ResultModal> {
       }
 
       await KakaoShareService.shareRoundResult(
-        roomCode: 'TEMP_ROOM_CODE', // 실제로는 룸 코드 필요
+        roomCode: widget.result['roomCode'],
         isWinner: widget.result['isCorrect'] ?? false,
-        answer: widget.result['correctAnswer'] ?? '알 수 없음',
+        answer: widget.result['correctAnswer'],
         timeTaken: widget.result['timeTaken'] ?? 0,
       );
 

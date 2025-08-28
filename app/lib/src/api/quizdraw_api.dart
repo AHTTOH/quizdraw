@@ -7,21 +7,25 @@ class QuizDrawAPI {
   static Future<int> getCoinBalance() async {
     try {
       final uid = _client.auth.currentUser?.id;
-      if (uid == null) throw Exception('로그인이 필요합니다');
-
-      final response = await _client
-          .from('coin_balances')
-          .select('balance')
-          .eq('user_id', uid)
-          .single();
-
-      return (response['balance'] as int?) ?? 0;
-    } catch (e) {
-      // 사용자가 없으면 0 반환
-      if (e.toString().contains('PGRST116')) {
+      if (uid == null) {
+        // 로그인되지 않은 경우 0 반환 (익명 사용자)
         return 0;
       }
-      throw Exception('잔액 조회 실패: $e');
+
+      // 코인 잔액 조회
+      final response = await _client
+          .from('coin_tx')
+          .select('amount')
+          .eq('user_id', uid);
+
+      if (response == null) return 0;
+      
+      final total = response.fold<int>(0, (sum, item) => sum + (item['amount'] as int? ?? 0));
+      return total;
+    } catch (e) {
+      // 에러 발생 시 0 반환 (사용자 경험 개선)
+      debugPrint('잔액 조회 실패: $e');
+      return 0;
     }
   }
 
@@ -31,11 +35,23 @@ class QuizDrawAPI {
       final uid = _client.auth.currentUser?.id;
       if (uid == null) throw Exception('로그인이 필요합니다');
 
+      // 사용자 정보 조회
+      final userResponse = await _client
+          .from('users')
+          .select('nickname')
+          .eq('id', uid)
+          .single();
+      
+      final nickname = userResponse['nickname'] as String?;
+      if (nickname == null || nickname.isEmpty) {
+        throw Exception('사용자 닉네임이 설정되지 않았습니다. 설정에서 닉네임을 변경해주세요.');
+      }
+
       final response = await _client.functions.invoke(
         'create-room',
         body: {
           'creator_user_id': uid,
-          'creator_nickname': '플레이어',
+          'creator_nickname': nickname,
         },
       );
 
@@ -55,12 +71,24 @@ class QuizDrawAPI {
       final uid = _client.auth.currentUser?.id;
       if (uid == null) throw Exception('로그인이 필요합니다');
 
+      // 사용자 정보 조회
+      final userResponse = await _client
+          .from('users')
+          .select('nickname')
+          .eq('id', uid)
+          .single();
+      
+      final nickname = userResponse['nickname'] as String?;
+      if (nickname == null || nickname.isEmpty) {
+        throw Exception('사용자 닉네임이 설정되지 않았습니다. 설정에서 닉네임을 변경해주세요.');
+      }
+
       final response = await _client.functions.invoke(
         'join-room',
         body: {
           'room_code': roomCode,
           'user_id': uid,
-          'nickname': '플레이어',
+          'nickname': nickname,
         },
       );
 
@@ -199,9 +227,13 @@ class QuizDrawAPI {
   /// 룸 정보 조회
   static Future<Map<String, dynamic>?> getRoomInfo(String roomCode) async {
     try {
+      // 룸 정보 조회
       final response = await _client
           .from('rooms')
-          .select('*, players(*)')
+          .select('''
+            *, 
+            players(*)
+          ''')
           .eq('code', roomCode)
           .single();
 
@@ -214,6 +246,7 @@ class QuizDrawAPI {
   /// 팔레트 목록 조회
   static Future<List<Map<String, dynamic>>> getPalettes() async {
     try {
+      // 팔레트 목록 조회
       final response = await _client
           .from('palettes')
           .select('*')
@@ -233,9 +266,13 @@ class QuizDrawAPI {
       final uid = _client.auth.currentUser?.id;
       if (uid == null) throw Exception('로그인이 필요합니다');
 
+      // 사용자 팔레트 조회
       final response = await _client
           .from('user_palettes')
-          .select('*, palettes(*)')
+          .select('''
+            *, 
+            palettes(*)
+          ''')
           .eq('user_id', uid);
 
       return (response as List)
@@ -245,7 +282,39 @@ class QuizDrawAPI {
       throw Exception('사용자 팔레트 조회 실패: $e');
     }
   }
+
+  /// 사용자 프로필 생성 또는 업데이트 (최초 로그인 시)
+  static Future<void> createOrUpdateUser(String nickname) async {
+    try {
+      final uid = _client.auth.currentUser?.id;
+      if (uid == null) throw Exception('로그인이 필요합니다');
+
+      // 사용자 프로필 생성 또는 업데이트
+      await _client
+          .from('users')
+          .upsert({
+            'id': uid,
+            'nickname': nickname,
+            'created_by': 'app:login'
+          });
+    } catch (e) {
+      throw Exception('사용자 프로필 생성 실패: $e');
+    }
+  }
+
+  /// 닉네임 업데이트
+  static Future<void> updateNickname(String newNickname) async {
+    try {
+      final uid = _client.auth.currentUser?.id;
+      if (uid == null) throw Exception('로그인이 필요합니다');
+
+      // 닉네임 업데이트
+      await _client
+          .from('users')
+          .update({'nickname': newNickname})
+          .eq('id', uid);
+    } catch (e) {
+      throw Exception('닉네임 업데이트 실패: $e');
+    }
+  }
 }
-
-
-

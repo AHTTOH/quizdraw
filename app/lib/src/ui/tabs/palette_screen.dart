@@ -153,7 +153,7 @@ class _PaletteScreenState extends State<PaletteScreen> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      palette['name'] ?? '알 수 없음',
+                                      palette['name'],
                                       style: const TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,

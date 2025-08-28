@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/rendering.dart';
 import '../../state/app_state.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -72,6 +75,19 @@ class SettingsScreen extends StatelessWidget {
                   
                   const Divider(),
                   
+                  // 닉네임 설정
+                  ListTile(
+                    title: const Text('닉네임'),
+                    subtitle: Text(appState.userNickname ?? '설정되지 않음'),
+                    leading: const Icon(Icons.person),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      _showNicknameDialog(context, appState);
+                    },
+                  ),
+                  
+                  const Divider(),
+                  
                   // 코인 잔액
                   ListTile(
                     title: const Text('코인 잔액'),
@@ -92,22 +108,6 @@ class SettingsScreen extends StatelessWidget {
                 title: '게임 설정',
                 icon: Icons.games,
                 children: [
-                  // 닉네임 설정
-                  ListTile(
-                    title: const Text('닉네임'),
-                    subtitle: const Text('게임에서 사용할 이름을 설정합니다'),
-                    leading: const Icon(Icons.person),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      // TODO: 닉네임 변경 다이얼로그 구현
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('닉네임 변경 기능은 준비 중입니다')),
-                      );
-                    },
-                  ),
-                  
-                  const Divider(),
-                  
                   // 기본 팔레트 설정
                   ListTile(
                     title: const Text('기본 팔레트'),
@@ -115,10 +115,7 @@ class SettingsScreen extends StatelessWidget {
                     leading: const Icon(Icons.palette),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
-                      // TODO: 기본 팔레트 선택 다이얼로그 구현
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('기본 팔레트 설정 기능은 준비 중입니다')),
-                      );
+                      _showPaletteDialog(context);
                     },
                   ),
                 ],
@@ -251,6 +248,118 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  void _showNicknameDialog(BuildContext context, AppState appState) {
+    final TextEditingController _nicknameController = TextEditingController(text: appState.userNickname);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('닉네임 변경'),
+        content: TextField(
+          controller: _nicknameController,
+          decoration: const InputDecoration(
+            hintText: '닉네임을 입력하세요',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () async {
+              final newNickname = _nicknameController.text.trim();
+              if (newNickname.isNotEmpty) {
+                try {
+                  await appState.updateNickname(newNickname);
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('닉네임이 "$newNickname"으로 변경되었습니다')),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('닉네임 변경 실패: $e')),
+                  );
+                }
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('닉네임을 입력해주세요')),
+                );
+              }
+            },
+            child: const Text('변경'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPaletteDialog(BuildContext context) {
+    final List<Map<String, dynamic>> palettes = [
+      {'name': '기본 팔레트', 'colors': ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF']},
+      {'name': '파스텔 팔레트', 'colors': ['#FFB3BA', '#BAFFC9', '#BAE1FF', '#FFFFBA', '#FFB3F7', '#B3F7FF']},
+      {'name': '어두운 팔레트', 'colors': ['#8B0000', '#006400', '#00008B', '#B8860B', '#8B008B', '#008B8B']},
+      {'name': '밝은 팔레트', 'colors': ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD']},
+    ];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('기본 팔레트 설정'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: palettes.length,
+            itemBuilder: (context, index) {
+              final palette = palettes[index];
+              return ListTile(
+                title: Text(palette['name']),
+                subtitle: Row(
+                  children: (palette['colors'] as List<String>).take(6).map((color) {
+                    return Container(
+                      width: 20,
+                      height: 20,
+                      margin: const EdgeInsets.only(right: 4),
+                      decoration: BoxDecoration(
+                        color: Color(int.parse(color.replaceAll('#', '0xFF'))),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                onTap: () async {
+                  try {
+                    // SharedPreferences에 기본 팔레트 저장
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setString('default_palette', palette['name']);
+                    
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('기본 팔레트가 "${palette['name']}"으로 설정되었습니다')),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('팔레트 설정 실패: $e')),
+                    );
+                  }
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showClearCacheDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -263,12 +372,25 @@ class SettingsScreen extends StatelessWidget {
             child: const Text('취소'),
           ),
           TextButton(
-            onPressed: () {
-              // TODO: 실제 캐시 삭제 구현
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('캐시가 삭제되었습니다')),
-              );
+              try {
+                // SharedPreferences 캐시 삭제
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.clear();
+                
+                // 이미지 캐시 삭제 (Flutter 기본 캐시)
+                await ImageCache().clear();
+                await ImageCache().clearLiveImages();
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('캐시가 삭제되었습니다')),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('캐시 삭제 실패: $e')),
+                );
+              }
             },
             child: const Text('삭제'),
           ),
@@ -289,12 +411,29 @@ class SettingsScreen extends StatelessWidget {
             child: const Text('취소'),
           ),
           TextButton(
-            onPressed: () {
-              // TODO: 실제 데이터 초기화 구현
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('데이터가 초기화되었습니다')),
-              );
+              try {
+                // SharedPreferences 초기화
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.clear();
+                
+                // 앱 상태 초기화
+                final appState = context.read<AppState>();
+                appState.updateAccessibilitySettings(
+                  isHighContrast: false,
+                  isLargeText: false,
+                  isColorBlindFriendly: false,
+                );
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('데이터가 초기화되었습니다')),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('데이터 초기화 실패: $e')),
+                );
+              }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('초기화'),
@@ -316,12 +455,18 @@ class SettingsScreen extends StatelessWidget {
             child: const Text('취소'),
           ),
           TextButton(
-            onPressed: () {
-              // TODO: 실제 로그아웃 구현
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('로그아웃되었습니다')),
-              );
+              try {
+                await Supabase.instance.client.auth.signOut();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('로그아웃되었습니다')),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('로그아웃 실패: $e')),
+                );
+              }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('로그아웃'),

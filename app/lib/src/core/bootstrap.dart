@@ -14,11 +14,7 @@ class Bootstrap {
       anonKey: AppConfig.supabaseAnonKey,
     );
 
-    // 익명 세션 확보
-    final supabase = Supabase.instance.client;
-    if (supabase.auth.currentSession == null) {
-      await supabase.auth.signInAnonymously();
-    }
+    // 로그인은 사용자 액션으로만 진행 (익명 로그인 비활성화 정책 준수)
 
     // Kakao
     kakao.KakaoSdk.init(nativeAppKey: AppConfig.kakaoNativeKey);

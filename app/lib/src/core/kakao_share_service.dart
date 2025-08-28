@@ -14,7 +14,7 @@ class KakaoShareService {
         content: kakao.Content(
           title: '🎨 그림퀴즈 게임 초대!',
           description: '${creatorName ?? '친구'}님이 그림퀴즈 게임에 초대했어요!\n방 코드: $roomCode',
-          imageUrl: Uri.parse('https://via.placeholder.com/400x400/6C7AF7/FFFFFF?text=QuizDraw'),
+          imageUrl: Uri.parse('https://quizdraw.app/images/logo.png'),
           link: kakao.Link(
             webUrl: Uri.parse('https://quizdraw.app/join?r=$roomId'),
             mobileWebUrl: Uri.parse('https://quizdraw.app/join?r=$roomId'),
@@ -62,7 +62,7 @@ class KakaoShareService {
         content: kakao.Content(
           title: '$resultText',
           description: '정답: $answer${timeTaken > 0 ? '\n소요시간: ${timeTaken}초' : ''}\n\n나도 그림퀴즈 게임 해보기!',
-          imageUrl: Uri.parse('https://via.placeholder.com/400x400/6C7AF7/FFFFFF?text=QuizDraw'),
+          imageUrl: Uri.parse('https://quizdraw.app/images/logo.png'),
           link: kakao.Link(
             webUrl: Uri.parse('https://quizdraw.app'),
             mobileWebUrl: Uri.parse('https://quizdraw.app'),

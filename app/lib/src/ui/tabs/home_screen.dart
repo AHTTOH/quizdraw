@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../state/app_state.dart';
 import '../../api/quizdraw_api.dart';
 import '../../core/admob_service.dart';
+import '../auth/login_modal.dart';
 import '../room/room_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -156,6 +157,27 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
+                  // 로그인 버튼 + 코인 잔액 표시
+                  IconButton(
+                    tooltip: '로그인',
+                    onPressed: () async {
+                      final result = await showDialog(
+                        context: context,
+                        barrierDismissible: true,
+                        builder: (_) => const LoginModal(),
+                      );
+                      if (result == true && mounted) {
+                        // 로그인 성공 시 잔액 새로고침
+                        context.read<AppState>().loadSession();
+                        context.read<AppState>().refreshBalance();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('카카오 로그인 성공!')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.login),
+                  ),
+                  const SizedBox(width: 8),
                   // 코인 잔액 표시 (작게)
                   Consumer<AppState>(
                     builder: (context, appState, child) {

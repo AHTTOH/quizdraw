@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:async';
 import '../../state/app_state.dart';
 import '../../api/quizdraw_api.dart';
 import '../../core/kakao_share_service.dart';
@@ -22,11 +24,71 @@ class _RoomScreenState extends State<RoomScreen> {
   bool _isLoading = true;
   bool _isStarting = false;
   bool _isLeaving = false;
+  StreamSubscription? _roomSubscription;
+  StreamSubscription? _playersSubscription;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadRoomInfo();
+    _setupRealTimeUpdates();
+    _setupPeriodicRefresh();
+  }
+
+  @override
+  void dispose() {
+    _roomSubscription?.cancel();
+    _playersSubscription?.cancel();
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  /// ✅ 실시간 업데이트 설정
+  void _setupRealTimeUpdates() {
+    try {
+      // 룸 상태 실시간 감지
+      _roomSubscription = Supabase.instance.client
+          .from('rooms')
+          .stream(primaryKey: ['id'])
+          .eq('code', widget.roomCode)
+          .listen((data) {
+        if (data.isNotEmpty && mounted) {
+          setState(() {
+            _roomInfo = data.first;
+          });
+        }
+      });
+
+      // 플레이어 변화 실시간 감지 (약간의 지연 후)
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted && _roomInfo != null) {
+          _playersSubscription = Supabase.instance.client
+              .from('players')
+              .stream(primaryKey: ['id'])
+              .eq('room_id', _roomInfo!['id'])
+              .listen((data) {
+            if (mounted) {
+              setState(() {
+                _players = List<Map<String, dynamic>>.from(data);
+              });
+            }
+          });
+        }
+      });
+    } catch (e) {
+      debugPrint('실시간 업데이트 설정 실패: $e');
+      // 실시간 업데이트 실패해도 앱은 계속 작동
+    }
+  }
+
+  /// ✅ 주기적 새로고침 (실시간이 안될 때 백업)
+  void _setupPeriodicRefresh() {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (mounted) {
+        _loadRoomInfo();
+      }
+    });
   }
 
   Future<String?> _promptAnswer() async {
@@ -51,13 +113,14 @@ class _RoomScreenState extends State<RoomScreen> {
 
   Future<void> _loadRoomInfo() async {
     try {
-      setState(() => _isLoading = true);
+      if (!_isLoading) setState(() => _isLoading = true);
+      
       final roomInfo = await QuizDrawAPI.getRoomInfo(widget.roomCode);
       if (mounted) {
         setState(() {
           _roomInfo = roomInfo;
           _players = List<Map<String, dynamic>>.from(
-            roomInfo?['quizdraw_players'] ?? [],
+            roomInfo?['players'] ?? [],
           );
           _isLoading = false;
         });
@@ -133,8 +196,7 @@ class _RoomScreenState extends State<RoomScreen> {
     try {
       final roomInfo = await QuizDrawAPI.getRoomInfo(widget.roomCode);
       // 실제로는 현재 진행중인 라운드의 그림 URL을 가져와야 함
-      // 여기서는 임시로 처리
-      roundId = 'temp-round-id';
+      roundId = roomInfo?['current_round_id'];
       imageUrl = roomInfo?['current_drawing_url'];
     } catch (e) {
       debugPrint('라운드 정보 가져오기 실패: $e');
@@ -146,7 +208,7 @@ class _RoomScreenState extends State<RoomScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => GuessModal(
         imageUrl: imageUrl,
-        roundId: roundId ?? 'temp-round-id',
+        roundId: roundId ?? '',
       ),
     );
 
@@ -180,10 +242,10 @@ class _RoomScreenState extends State<RoomScreen> {
 
       await KakaoShareService.shareRoomInvite(
         roomCode: widget.roomCode,
-        roomId: _roomInfo?['id'] ?? '',
+        roomId: _roomInfo!['id'],
         creatorName: _players.firstWhere(
           (p) => p['user_id'] == _roomInfo?['created_by'],
-          orElse: () => {'nickname': '플레이어'},
+          orElse: () => {'nickname': '알 수 없음'},
         )['nickname'],
       );
 
@@ -207,7 +269,18 @@ class _RoomScreenState extends State<RoomScreen> {
     setState(() => _isLeaving = true);
     
     try {
-      // TODO: 방 나가기 API 호출
+      final supabase = Supabase.instance.client;
+      final currentUserId = context.read<AppState>().userId;
+      
+      if (currentUserId != null && _roomInfo != null) {
+        // 플레이어에서 제거
+        await supabase
+            .from('players')
+            .delete()
+            .eq('room_id', _roomInfo!['id'])
+            .eq('user_id', currentUserId);
+      }
+
       if (mounted) {
         Navigator.pop(context);
       }
@@ -238,6 +311,12 @@ class _RoomScreenState extends State<RoomScreen> {
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
         actions: [
+          // 새로고침 버튼
+          IconButton(
+            onPressed: _loadRoomInfo,
+            icon: const Icon(Icons.refresh),
+            tooltip: '새로고침',
+          ),
           // 카카오 공유 버튼
           IconButton(
             onPressed: _shareRoom,
@@ -289,6 +368,18 @@ class _RoomScreenState extends State<RoomScreen> {
                             color: _getStatusColor(),
                           ),
                         ),
+                        const Spacer(),
+                        // 실시간 상태 표시
+                        Icon(
+                          Icons.circle,
+                          size: 8,
+                          color: _roomSubscription != null ? Colors.green : Colors.grey,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _roomSubscription != null ? '실시간' : '수동',
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
                       ],
                     ),
                   ),
@@ -296,9 +387,9 @@ class _RoomScreenState extends State<RoomScreen> {
                   const SizedBox(height: 24),
                   
                   // 플레이어 목록
-                  const Text(
-                    '플레이어 목록',
-                    style: TextStyle(
+                  Text(
+                    '플레이어 목록 (${_players.length}명)',
+                    style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
@@ -439,10 +530,7 @@ class _RoomScreenState extends State<RoomScreen> {
       case 'ended':
         return '게임 종료';
       default:
-        return '알 수 없음';
+        return '대기 중';
     }
   }
 }
-
-
-

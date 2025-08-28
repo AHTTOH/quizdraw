@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 // import 'package:uni_links/uni_links.dart'; // 주석 해제 필요 시
 import '../ui/room/room_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DeepLinkHandler {
   static StreamSubscription<dynamic>? _linkSubscription;
@@ -109,15 +110,35 @@ class DeepLinkHandler {
     
     final context = navigatorKey?.currentContext;
     if (context != null) {
-      // 라운드 딥링크는 일단 홈으로 이동 후 알림
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('초대장을 통해 입장했습니다! 게임을 찾는 중...'),
-          backgroundColor: Colors.blue,
-        ),
-      );
+      // 라운드가 있는 방을 찾아서 입장
+      _findRoomByRoundId(roundId).then((roomCode) {
+        if (roomCode != null) {
+          _navigateToRoom(roomCode);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('해당 라운드를 찾을 수 없습니다.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      });
+    }
+  }
+
+  static Future<String?> _findRoomByRoundId(String roundId) async {
+    try {
+      // Supabase에서 라운드 ID로 방 코드 조회
+      final response = await Supabase.instance.client
+          .from('rounds')
+          .select('rooms!inner(code)')
+          .eq('id', roundId)
+          .single();
       
-      // TODO: 실제로는 해당 라운드가 있는 방을 찾아서 입장해야 함
+      return response['rooms']['code'] as String?;
+    } catch (e) {
+      debugPrint('Failed to find room by round ID: $e');
+      return null;
     }
   }
 

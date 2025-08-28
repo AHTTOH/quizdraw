@@ -6,6 +6,7 @@ import 'onboarding_screen.dart';
 import 'tabs/home_screen.dart';
 import 'tabs/palette_screen.dart';
 import 'tabs/settings_screen.dart';
+import 'tabs/mypage_screen.dart';
 
 class AppRoot extends StatefulWidget {
   final GlobalKey<NavigatorState> navigatorKey;
@@ -72,7 +73,7 @@ class _AppRootState extends State<AppRoot> {
       );
     }
 
-    final pages = const [HomeScreen(), PaletteScreen(), SettingsScreen()];
+    final pages = const [HomeScreen(), MyPageScreen(), PaletteScreen(), SettingsScreen()];
 
     return MaterialApp(
       title: '너랑 나의 그림퀴즈',
@@ -117,6 +118,11 @@ class _AppRootState extends State<AppRoot> {
                     icon: Icon(Icons.home_outlined), 
                     selectedIcon: Icon(Icons.home), 
                     label: 'Home'
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.photo_library_outlined), 
+                    selectedIcon: Icon(Icons.photo_library), 
+                    label: 'MyPage'
                   ),
                   NavigationDestination(
                     icon: Icon(Icons.palette_outlined), 

@@ -1,22 +1,30 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'app_config.dart';
 
 class AdMobService {
   static RewardedAd? _rewardedAd;
   static bool _isAdLoaded = false;
   static bool _isLoading = false;
 
-  // AdMob 단위 ID (테스트용)
-  static const String _testRewardedAdUnitId = 'ca-app-pub-3940256099942544/5224354917';
-  static const String _androidRewardedAdUnitId = 'ca-app-pub-3940256099942544/5224354917'; // 실제 ID로 변경 필요
-  static const String _iosRewardedAdUnitId = 'ca-app-pub-3940256099942544/1712485313'; // 실제 ID로 변경 필요
-
   static String get _rewardedAdUnitId {
-    if (kIsWeb) return _testRewardedAdUnitId;
-    if (Platform.isAndroid) return _androidRewardedAdUnitId;
-    if (Platform.isIOS) return _iosRewardedAdUnitId;
-    return _testRewardedAdUnitId;
+    if (kIsWeb) {
+      throw UnsupportedError('웹에서는 AdMob이 지원되지 않습니다');
+    }
+    if (Platform.isAndroid) {
+      if (AppConfig.androidRewardAdUnit.isEmpty) {
+        throw Exception('MISSING_CONFIG: ANDROID_REWARD_AD_UNIT_ID');
+      }
+      return AppConfig.androidRewardAdUnit;
+    }
+    if (Platform.isIOS) {
+      if (AppConfig.iosRewardAdUnit.isEmpty) {
+        throw Exception('MISSING_CONFIG: IOS_REWARD_AD_UNIT_ID');
+      }
+      return AppConfig.iosRewardAdUnit;
+    }
+    throw UnsupportedError('지원되지 않는 플랫폼입니다');
   }
 
   /// 보상형 광고 로드
